@@ -258,11 +258,15 @@ getNextGenChar ( const char* string, char** search, char** replace,
 //  Lindenmeyer Generation (via context menu)
 // ============================================================
 
+int current_generation = 0;
+
 void
 set_generation ( int gen )
 {
-  if ( gen < 0 || gen > 9 ) return;
+  if ( gen < 0 /*|| gen > 9*/ ) return;
 
+  current_generation = gen;
+  
   pos = 0;
   current_depth = gen;
 
@@ -398,6 +402,10 @@ void keyboard(unsigned char key, int x, int y)
 		exit(0);
 	} else if (key=='s') {
 	  dump_frame_buffer_to_BMP();
+	} else if (key=='+') {
+	  set_generation(current_generation + 1);
+	} else if (key=='-') {
+	  set_generation(current_generation - 1);
 	}
 	glutPostRedisplay();
 }
