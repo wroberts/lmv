@@ -1,11 +1,30 @@
+#include "config.h"
 #include <iostream>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <stdio.h>
+#if defined(HAVE_WINDOWS_H) && defined(_WIN32)
+#include <windows.h>
+#endif
+#ifdef HAVE_GL_GL_H
+#include <GL/gl.h>
+#elif defined(HAVE_OPENGL_GL_H) || defined(HAVE_APPLE_OPENGL_FRAMEWORK)
 #include <OpenGL/gl.h>
+#else
+#error no gl.h
+#endif
+#if HAVE_WINDOWS_H && defined(_WIN32)
+#include <windows.h>
+#endif
+#if defined(HAVE_GL_GLUT_H)
+#include <GL/glut.h>
+#elif defined(HAVE_GLUT_GLUT_H) || defined(HAVE_APPLE_OPENGL_FRAMEWORK)
 #include <GLUT/glut.h>
+#else
+#error no glut.h
+#endif
 #include <math.h>
 
 using namespace std;
@@ -633,8 +652,8 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    cout << "lmv - Lindenmeyer System Visualizer\n";
-    cout << "(c) 2005 Will Roberts\n\n";
+    cout << PACKAGE_STRING << " - Lindenmeyer System Visualizer\n";
+    cout << "(c) 2005, 2014 Will Roberts\n\n";
 
     if (print_syntax || !argc) {
         cout << "Draws and recursively generates turtle strings using a\n";
