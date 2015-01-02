@@ -9,6 +9,11 @@ AC_PROG_CXX
 AX_CHECK_GL
 AX_CHECK_GLU
 AX_CHECK_GLUT
+# Check for library functions
+AC_FUNC_STRTOD
+AC_CHECK_FUNCS([pow])
+AC_CHECK_FUNCS([strstr])
+AC_CHECK_FUNCS(bzero memset, break)
 # Output files
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile src/Makefile])
