@@ -1,3 +1,4 @@
 ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = LICENSE.md README.md
 SUBDIRS = src
+AM_DISTCHECK_CONFIGURE_FLAGS = --with-apple-opengl-framework
