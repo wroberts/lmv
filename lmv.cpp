@@ -1,4 +1,4 @@
-#include <iostream.h>
+#include <iostream>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <OpenGL/gl.h>
 #include <GLUT/glut.h>
+#include <math.h>
+
+using namespace std;
 
 // ============================================================
 //  Declarations (embryonic header file)
