@@ -9,6 +9,8 @@ AC_PROG_CXX
 AX_CHECK_GL
 AX_CHECK_GLU
 AX_CHECK_GLUT
+# Checks for typedefs, structures, and compiler characteristics.
+AC_CHECK_HEADER_STDBOOL
 # Check for library functions
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([pow])
