@@ -8,7 +8,7 @@ Homepage: http://amor.cms.hu-berlin.de/~robertsw/lm.html
 Source: https://github.com/wroberts/lmv
 
 This project is licensed under the terms of the MIT license (see
-LICENSE.md).
+[LICENSE.md](https://github.com/wroberts/lmv/blob/master/LICENSE.md)).
 
 ## Description
 
