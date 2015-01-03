@@ -1,5 +1,5 @@
 # Prelude
-AC_INIT([lmv], [1.0], [wildwilhelm@gmail.com])
+AC_INIT([lmv], [1.1], [wildwilhelm@gmail.com])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([foreign -Wall -Werror])
