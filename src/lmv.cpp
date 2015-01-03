@@ -32,16 +32,51 @@
 
 using namespace std;
 
+//
+// LINDENMAYER SYSTEM VIEWER
+// v 1.1, (c) Will Roberts   4 Apr 2005
+//
+// command-line based
+// fast stack-based rewriting system
+// graphics context autonormalisation by computing bounding box
+// better documentation
+//
+
 // ============================================================
-//  Declarations (embryonic header file)
+//  Header
 // ============================================================
 
+// Main menu constants--must be type int.
+// Each menu item should be identified by a unique identifier.
+const int A1_EXIT = 4;
+const int A1_SAVE = 5;
+
+// lindenmayer rewrite functions
+
+char getNextChar();
+char getNextGenChar ( const char*, char**, char**, int, int, int*& );
+char getNextBufChar ( const char*, int& );
+
+// opengl user interaction
+
+void set_generation ( int gen );
 void dump_frame_buffer_to_BMP();
+void reshape_callback(int w, int h);
 
 
 // ============================================================
 //  Turtle Stack linked list structure
 // ============================================================
+//
+//  This class is here as a simple utility to aid in the stack-based
+//  turtle traversal of a Lindenmayer string.  With the allowance of
+//  '[' and ']' characters in the string, the system must provide for
+//  a stack-based memory system for unwinding.
+//
+//  The current turtle state can be completely expressed by the x and
+//  y coordinates, and the current heading.  These are packed into an
+//  array, which is stored in the state_data pointer.
+//
 
 class TurtleStackList {
 
@@ -71,79 +106,49 @@ TurtleStackList::~TurtleStackList() {
 
 
 // ============================================================
-//  Program Constants, Global Variables, etc.
+//  Program Data (global variables)
 // ============================================================
 
-// this was used to generate lsystems in character arrays
-const int BUFFER_SIZE = 10 * 1024;
-
-int context_width = 500;
-int context_height = 500;
-
-// Main menu constants--must be type int.
-// Each menu item should be identified by a unique identifier.
-const int A1_EXIT = 4;
-const int A1_SAVE = 5;
-
-// these variables should also be settable on the command line
-float delta = 40.0;                       // angle to turn by, in degrees
-float d = 0.25;                           // the distance to travel
-float dinit = d;
-float scale = 1;
-
-float xinit = 0;                          // initial x position of turtle
-float yinit = -0.5;                       // initial y position of turtle
-float headinginit = 90.0;
-
-// "F -> F[+F]F[-F]F", generation 3.
+// lindenmayer system data
 char* command_string = "";
 char* init_string = 0;
 int num_lrules = 0;
 char** lhs = 0;
 char** rhs = 0;
 
-// global variables for using a lindenmeyer production system
+// global variables for reading a single command string
+int pos = 0;
+
+// global variables for stack-based lindenmayer production system
 int rule_based = 0;
 int current_depth = 0;
 int* gen_string_array = 0;
 
-// global variables for reading a single command string
-int pos = 0;
+// turtle control settings
+// these variables are settable on the command line
+float delta = 40.0;                       // angle to turn by, in degrees
+float headinginit = 90.0;
 
+// the current opengl window size
+int context_width = 500;
+int context_height = 500;
 
-// ============================================================
-//  Context-Sensitive Menu
-// ============================================================
-
-// The function that handles main menu events.
-// Whenever a menu item is requested, the system will call this
-// function.
-void main_menu_callback(int value)
-{
-    switch(value) {
-    case A1_EXIT:
-        exit(0);
-    case A1_SAVE:
-        dump_frame_buffer_to_BMP();
-        break;
-    default:
-        cerr << "Unknown value in main_menu_callback\n";
-        exit(1);
-    }
-    glutPostRedisplay();
-}
-
+// for view autonormalization
+float bounds_xmin = -0.5 * 0.9;
+float bounds_ymin = -0.5 * 0.9;
+float bounds_xmax = 0.5 * 0.9;
+float bounds_ymax = 0.5 * 0.9;
 
 
 
 // ============================================================
-//  Lindenmeyer rewrite rules
+//  Stack-Based Lindenmayer Rewriting System
 // ============================================================
 
-char getNextChar();
-char getNextGenChar ( const char*, char**, char**, int, int, int*& );
-char getNextBufChar ( const char*, int& );
-
+//
+// global wrapper function for either single-string or rule-based
+// system operation.
+//
 char
 getNextChar()
 {
@@ -165,6 +170,9 @@ getNextChar()
 
 }
 
+//
+// returns the next character from a single-string system
+//
 char
 getNextBufChar ( const char* cstr, int &pos )
 {
@@ -174,6 +182,21 @@ getNextBufChar ( const char* cstr, int &pos )
 
 }
 
+//
+// returns the next character from a rule-based production system.
+//
+// this function uses a stack to explicitly perform the recursive
+// operation of rewriting the lindenmayer system.
+//
+// this stack is stored in the variable gen_string_array.  other
+// arguments to this function are:
+//
+// string    - the initial string for the system
+// search    - the left-hand sides of the rewrite rules, in an array
+// replace   - the right-hand sides of the rules, in an array
+// num_rules - the number of rules in the production system
+// maxDepth  - the number of recursions to perform
+//
 char
 getNextGenChar ( const char* string, char** search, char** replace,
                  int num_rules, int maxDepth, int* &gen_string_array )
@@ -277,22 +300,57 @@ getNextGenChar ( const char* string, char** search, char** replace,
 
 
 // ============================================================
-//  Lindenmeyer Generation (via context menu)
+//  GLUT User Interaction
 // ============================================================
 
-int current_generation = 0;
+// The function that handles main menu events.
+// Whenever a menu item is requested, the system will call this
+// function.
+void main_menu_callback(int value)
+{
+    switch(value) {
+    case A1_EXIT:
+        exit(0);
+    case A1_SAVE:
+        dump_frame_buffer_to_BMP();
+        break;
+    default:
+        cerr << "Unknown value in main_menu_callback\n";
+        exit(1);
+    }
+    glutPostRedisplay();
+}
 
+// responds to keyboard actions
+void keyboard(unsigned char key, int x, int y)
+{
+    if (key=='q' || key=='x') {
+        exit(0);
+    } else if (key=='s') {
+        dump_frame_buffer_to_BMP();
+    } else if (key=='+') {
+        set_generation(current_depth + 1);
+    } else if (key=='-') {
+        set_generation(current_depth - 1);
+    }
+    glutPostRedisplay();
+}
+
+
+
+
+// ============================================================
+//  Select Lindenmayer Iteration (via context menu)
+// ============================================================
+
+// sets the current lindenmayer iteration or generation
 void
 set_generation ( int gen )
 {
     if ( gen < 0 /*|| gen > 9*/ ) return;
 
-    current_generation = gen;
-
     pos = 0;
     current_depth = gen;
-
-    d = dinit / pow ( scale, gen );
 
     glutPostRedisplay();
 }
@@ -301,9 +359,22 @@ set_generation ( int gen )
 
 
 // ============================================================
-//  Frame Buffer dump to numbered BMP
+//  Frame Buffer Dump to numbered BMP
 // ============================================================
 
+//
+// dumps the current opengl frame buffer to a bitmap file in the
+// current directory.
+//
+// the function automatically generates a filename for the image, with
+// the format GL00000001.BMP.  it checks to see whether a file with
+// that name exists; if one does, it then generates the next filename
+// in the sequence.  in this way, it produces sequential files, never
+// overwriting older data.
+//
+// the pixel data are read raw from the frame buffer and dumped to a
+// binary file, with a true color bitmap header tacked on the top.
+//
 void
 dump_frame_buffer_to_BMP()
 {
@@ -418,34 +489,131 @@ dump_frame_buffer_to_BMP()
 
 }
 
-void keyboard(unsigned char key, int x, int y)
+
+// ======================================================================
+//  Bounding Box
+// ======================================================================
+
+//
+// computes the bounding box of the current turtle curve and stores
+// the result in global variables bounds_[x/y][min/max]
+//
+// like the display function, this function must iterate through all
+// of the current lindenmayer string to compute the bounds.
+//
+void bounding_box()
 {
-    if (key=='q' || key=='x') {
-        exit(0);
-    } else if (key=='s') {
-        dump_frame_buffer_to_BMP();
-    } else if (key=='+') {
-        set_generation(current_generation + 1);
-    } else if (key=='-') {
-        set_generation(current_generation - 1);
+    float xpos = 0;
+    float ypos = 0;
+    float heading = headinginit;   // heading is in degrees
+
+    bounds_xmin = xpos;
+    bounds_xmax = xpos;
+    bounds_ymin = ypos;
+    bounds_ymax = ypos;
+
+    // turtle stack
+    TurtleStackList* stack = 0;
+
+    // reset the stack-based production system
+    pos = 0;
+    if ( gen_string_array ) delete gen_string_array;
+    gen_string_array = 0;
+
+    char c;
+    while ( 1 ) {
+        // get a character off the command string
+        c = getNextChar();
+        if ( !c ) break;
+        switch ( c ) {
+
+        case 'F':
+        case 'f':
+            // calculate the new point
+            xpos += cos ( heading * M_PI / 180.0 );
+            ypos += sin ( heading * M_PI / 180.0 );
+            if ( xpos < bounds_xmin ) bounds_xmin = xpos;
+            if ( xpos > bounds_xmax ) bounds_xmax = xpos;
+            if ( ypos < bounds_ymin ) bounds_ymin = ypos;
+            if ( ypos > bounds_ymax ) bounds_ymax = ypos;
+            break;
+
+        case '-':
+            // turn left, i.e. by adding to the heading
+            heading += delta;
+            break;
+
+        case '+':
+            // turn right, i.e. by subtracting from the heading
+            heading -= delta;
+            break;
+
+        case '[':
+            // push the current state onto the stack
+            float* state;
+            state = new float[3];
+            state[0] = xpos;
+            state[1] = ypos;
+            state[2] = heading;
+            stack = new TurtleStackList ( state, stack );
+            break;
+
+        case ']':
+            // pop the current state from the stack
+            if ( stack == 0 ) {
+                cerr << "Error popping turtle state from empty stack.\n";
+                exit(1);
+            }
+            TurtleStackList* restore_state;
+            restore_state = stack;
+            stack = stack->next;
+
+            xpos = restore_state->state_data[0];
+            ypos = restore_state->state_data[1];
+            heading = restore_state->state_data[2];
+            delete restore_state;
+
+            break;
+
+        default:
+            break;
+
+        }
     }
-    glutPostRedisplay();
+
+    // clean up the turtle stack
+    if ( stack ) {
+
+        while ( stack ) {
+            TurtleStackList* temp = stack;
+            stack = stack->next;
+            delete temp;
+        }
+
+    }
+
+    reshape_callback(context_width, context_height);
+
 }
 
 
 
 
-
 // ============================================================
-//  Display Function
+//  Display
 // ============================================================
 
 //
-// The function that handles drawing the display.
-// This function must be defined somewhere.
+// The function that handles drawing the display.  Iterates through
+// the current lindenmayer string, interpreting the characters as
+// turtle commands.
+//
+// Turtle output is drawn to the OpenGL context.
 //
 void display_callback(void)
 {
+    // recompute bounds
+    bounding_box();
     glClear(GL_COLOR_BUFFER_BIT);
 
     glColor3f(0.0, 0.0, 0.0);
@@ -455,8 +623,8 @@ void display_callback(void)
     // the current turtle state
     // default starting turtle location is at
     // the bottom facing up
-    float xpos = xinit;
-    float ypos = yinit;
+    float xpos = 0;
+    float ypos = 0;
     float heading = headinginit; // heading is in degrees
 
     // this is the turtle state stack
@@ -486,8 +654,8 @@ void display_callback(void)
             glVertex3d ( xpos, ypos, 0 );
 
             // calculate the new point
-            xpos += d * cos ( heading * M_PI / 180.0 );
-            ypos += d * sin ( heading * M_PI / 180.0 );
+            xpos += cos ( heading * M_PI / 180.0 );
+            ypos += sin ( heading * M_PI / 180.0 );
 
             glVertex3d ( xpos, ypos, 0 );
 
@@ -499,8 +667,8 @@ void display_callback(void)
             drawing = 0;
 
             // calculate the new point
-            xpos += d * cos ( heading * M_PI / 180.0 );
-            ypos += d * sin ( heading * M_PI / 180.0 );
+            xpos += cos ( heading * M_PI / 180.0 );
+            ypos += sin ( heading * M_PI / 180.0 );
 
             break;
 
@@ -562,39 +730,62 @@ void display_callback(void)
     glFlush();
     glutSwapBuffers();
 
+    // clean up the turtle stack
+    if ( stack ) {
+
+        while ( stack ) {
+            TurtleStackList* temp = stack;
+            stack = stack->next;
+            delete temp;
+        }
+
+    }
+
 }
 
 
 
 
 // ============================================================
-//  Window Resize Callback
+//  Window Resize
 // ============================================================
 
 //
-// The function that handles window resizes.
-// Not necessary.
+// The function that handles window resizes.  Uses the currently
+// computed bounds to set up the graphics context properly
 //
 void reshape_callback(int w, int h)
 {
     glViewport(0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h));
 
+    float mtop;
+    float mbot;
+    float mleft;
+    float mright;
+
+    if ( (bounds_xmax - bounds_xmin) /
+         (float)(bounds_ymax - bounds_ymin) <
+         w / (float)h ) {
+
+        mtop = bounds_ymax + (bounds_ymax - bounds_ymin) * 0.1;
+        mbot = bounds_ymin - (bounds_ymax - bounds_ymin) * 0.1;
+        float mw = w * (mtop - mbot) / h;
+        mleft = bounds_xmin - (mw - (bounds_xmax - bounds_xmin)) / 2.0;
+        mright = bounds_xmax + (mw - (bounds_xmax - bounds_xmin)) / 2.0;
+
+    } else {
+
+        mleft = bounds_xmin - (bounds_xmax - bounds_xmin) * 0.1;
+        mright = bounds_xmax + (bounds_xmax - bounds_xmin) * 0.1;
+        float mh = h * (mright - mleft) / w;
+        mtop = bounds_ymax + (mh - (bounds_ymax - bounds_ymin)) / 2.0;
+        mbot = bounds_ymin - (mh - (bounds_ymax - bounds_ymin)) / 2.0;
+
+    }
+
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    if(w <= h)
-        glOrtho(-0.5,
-                0.5,
-                -0.5 * static_cast<GLfloat>(h) / static_cast<GLfloat>(w),
-                0.5 * static_cast<GLfloat>(h) / static_cast<GLfloat>(w),
-                -0.5,
-                0.5);
-    else
-        glOrtho(-0.5 * static_cast<GLfloat>(w) / static_cast<GLfloat>(h),
-                0.5 * static_cast<GLfloat>(w) / static_cast<GLfloat>(h),
-                -0.5,
-                0.5,
-                -0.5,
-                0.5);
+    glOrtho ( mleft, mright, mbot, mtop, -0.5, 0.5 );
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -618,6 +809,20 @@ void OpenGLInit(void)
     glPointSize(4.0);
 }
 
+//
+// main function
+//
+// 1. read command line arguments and print syntax if there are any
+//    mistakes
+//
+// 2. parse out lindenmayer rules or command string and initialise
+//    lindenmayer production system
+//
+// 3. set up open gl context using glut.  register callback functions
+//    for context menu and keyboard.
+//
+// 4. after program completes, clean up program data.
+//
 int main(int argc, char **argv)
 {
 
@@ -626,25 +831,13 @@ int main(int argc, char **argv)
     int print_syntax = 0;
 
     bflag = 0;
-    while ((ch = getopt(argc, argv, "x:y:h:d:a:s:")) != -1)
+    while ((ch = getopt(argc, argv, "r:a:")) != -1)
         switch (ch) {
-        case 'x':
-            xinit = strtod(optarg,0);
-            break;
-        case 'y':
-            yinit = strtod(optarg,0);
-            break;
-        case 'h':
-            headinginit = strtod(optarg,0);
-            break;
-        case 'd':
-            d = dinit = strtod(optarg,0);
+        case 'r':
+            headinginit = strtod(optarg,0) + 90.0;
             break;
         case 'a':
             delta = strtod(optarg,0);
-            break;
-        case 's':
-            scale = strtod(optarg,0);
             break;
         case '?':
         default:
@@ -655,22 +848,17 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    cout << PACKAGE_STRING << " - Lindenmeyer System Visualizer\n";
+    cout << PACKAGE_STRING << " - Lindenmayer System Visualizer\n";
     cout << "(c) 2005, 2014 Will Roberts\n\n";
 
     if (print_syntax || !argc) {
         cout << "Draws and recursively generates turtle strings using a\n";
-        cout << "Lindenmeyer grammar specified by the user.\n";
-        cout << "Drawing space ranges from at least -0.5 to +0.5 in both x and y.\n";
-        cout << "\nSyntax:\n\nlmv [-x xin] [-y yin] [-a del]";
-        cout << " [-h hed] [-d dis] [-s sca] LSTRING [INIT]\n\n";
-        cout << "  xin:     initial x-location of the turtle as a real coord.\n";
-        cout << "  yin:     initlal y-location of the turtle as a real coord.\n";
-        cout << "  del:     the angle, in degrees, to turn the turtle by.\n";
-        cout << "  hed:     the initial heading, in degrees, of the turtle.\n";
-        cout << "  dis:     the distance to travel at each forward step.\n";
-        cout << "  sca:     the size of the RHS divided by the size of the LHS.\n";
-        cout << "  LSTRING: the turtle string to draw or a Lindenmeyer rule.\n";
+        cout << "Lindenmayer grammar specified by the user.\n";
+        cout << "Drawing space autosizes.\n";
+        cout << "\nSyntax:\n\nlmv [-a delta] [-r rot] LSTRING [INIT]\n\n";
+        cout << "  delta:   the angle, in degrees, to turn the turtle by.\n";
+        cout << "  rot:     the amount to rotate the picture by, in degrees.\n";
+        cout << "  LSTRING: the turtle string to draw or a Lindenmayer rule.\n";
         cout << "  INIT:    the initial turtle string to draw, if using rules.\n";
         cout << "           if not specified, the LHS of the rule is used.\n";
         exit(0);
@@ -702,9 +890,7 @@ int main(int argc, char **argv)
         init_string = argv[argc - 1];
     }
 
-    cout << "Xpos: " << xinit << "\nYpos: " << yinit;
-    cout << "\nHeading: " << headinginit << "\nDelta: " << delta;
-    cout << "\nDist: " << d << "\nScale: " << scale << "\n";
+    cout << "Heading: " << headinginit << "\nDelta: " << delta << "\n";
     if ( init_string ) cout << "Init: " << init_string << "\n";
 
     // check if we've got a simple rule system
@@ -746,9 +932,9 @@ int main(int argc, char **argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 
     // Make a 500 x 500 window and place it at 100 x 100.
-    glutInitWindowSize(500, 500);
+    glutInitWindowSize(context_width, context_height);
     glutInitWindowPosition(100, 100);
-    glutCreateWindow("L-Sytem Visualizer");
+    glutCreateWindow("L-System Visualizer");
 
     int generation_submenu = 0;
     if ( rule_based ) {
@@ -771,20 +957,19 @@ int main(int argc, char **argv)
         glutAddSubMenu("L-System Generation", generation_submenu );
     glutAddMenuEntry("Save current frame to BMP", A1_SAVE);
     glutAddMenuEntry("Exit", A1_EXIT);
-    glutAttachMenu(GLUT_RIGHT_BUTTON);
+    glutAttachMenu(GLUT_LEFT_BUTTON);
 
-    // Tell glut which function is to handle drawing events.
-    // Whenever the system determines that the window must be
-    // redrawn, the callback function "display_callback" will
-    // be called.  You can force the function to be called by
-    // using glutPostRedisplay().
+    // Tell glut which function is to handle drawing events.  Whenever
+    // the system determines that the window must be redrawn, the
+    // callback function "display_callback" will be called.  You can
+    // force the function to be called by using glutPostRedisplay().
     glutDisplayFunc(display_callback);
 
     // Tell glut which function is to handle reshape events.
     glutReshapeFunc(reshape_callback);
 
-    // Tell glut to call this keyboard callback
-    // to allow frames to be printed to bmp files as the user desires
+    // Tell glut to call this keyboard callback to allow frames to be
+    // printed to bmp files as the user desires
     glutKeyboardFunc ( keyboard );
 
     // initialize
@@ -792,6 +977,8 @@ int main(int argc, char **argv)
 
     // go into an infinite loop (basically)
     glutMainLoop();
+
+    // clean up
 
     if (rule_based) {
         for (int i = 0; i < num_lrules; i++) {
